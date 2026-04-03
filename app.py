@@ -12,7 +12,7 @@ tool = st.sidebar.selectbox(
 
 if tool == "✨ Smart Object Remover":
 
-    st.subheader("✨ Click → Remove Object (Smooth Blend)")
+    st.subheader("✨ Click → Remove Object (Pro Blend)")
 
     components.html("""
     <html>
@@ -71,36 +71,45 @@ if tool == "✨ Smart Object Remover":
         pts.forEach(p => {
             const radius = p.size;
 
-            // ✅ Step 1: Get surrounding average color
-            let r = 0, g = 0, b = 0, count = 0;
+            // ✅ NEW: Directional color sampling (fix blur issue)
+            let samples = [];
 
-            for (let y = -radius * 2; y <= radius * 2; y++) {
-                for (let x = -radius * 2; x <= radius * 2; x++) {
+            const directions = [
+                {dx: 0, dy: -radius * 1.5},
+                {dx: 0, dy: radius * 1.5},
+                {dx: -radius * 1.5, dy: 0},
+                {dx: radius * 1.5, dy: 0}
+            ];
 
-                    const dist = Math.sqrt(x*x + y*y);
+            directions.forEach(d => {
+                let sx = Math.floor(p.x + d.dx);
+                let sy = Math.floor(p.y + d.dy);
 
-                    if (dist > radius && dist < radius * 2.5) {
-                        const sx = Math.floor(p.x + x);
-                        const sy = Math.floor(p.y + y);
-
-                        if (sx >= 0 && sy >= 0 && sx < canvas.width && sy < canvas.height) {
-                            const i = (sy * canvas.width + sx) * 4;
-                            r += data[i];
-                            g += data[i + 1];
-                            b += data[i + 2];
-                            count++;
-                        }
-                    }
+                if (sx >= 0 && sy >= 0 && sx < canvas.width && sy < canvas.height) {
+                    const i = (sy * canvas.width + sx) * 4;
+                    samples.push([
+                        data[i],
+                        data[i + 1],
+                        data[i + 2]
+                    ]);
                 }
-            }
+            });
 
-            if (count === 0) return;
+            if (samples.length === 0) return;
 
-            r = r / count;
-            g = g / count;
-            b = b / count;
+            let r = 0, g = 0, b = 0;
 
-            // ✅ Step 2: Smooth blended fill
+            samples.forEach(c => {
+                r += c[0];
+                g += c[1];
+                b += c[2];
+            });
+
+            r /= samples.length;
+            g /= samples.length;
+            b /= samples.length;
+
+            // ✅ Smooth blend fill
             for (let y = -radius; y <= radius; y++) {
                 for (let x = -radius; x <= radius; x++) {
 
@@ -120,10 +129,10 @@ if tool == "✨ Smart Object Remover":
                             data[i + 1] = data[i + 1] * (1 - alpha) + g * alpha;
                             data[i + 2] = data[i + 2] * (1 - alpha) + b * alpha;
 
-                            // tiny noise
-                            data[i]     += Math.random() * 2;
-                            data[i + 1] += Math.random() * 2;
-                            data[i + 2] += Math.random() * 2;
+                            // ✅ slight sharpening (fix washed look)
+                            data[i]     = Math.min(255, data[i] * 1.05);
+                            data[i + 1] = Math.min(255, data[i + 1] * 1.05);
+                            data[i + 2] = Math.min(255, data[i + 2] * 1.05);
                         }
                     }
                 }
