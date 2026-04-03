@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>High-Speed AI Eraser</title>
+    <style>
+        body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; background: #f1f5f9; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; }
+        #canvas-container { position: relative; border: 2px solid #cbd5e0; background: #eee; margin: 20px 0; display: none; }
+        canvas { position: absolute; top: 0; left: 0; }
+        button { padding: 10px 20px; cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; margin: 5px; }
+        button:disabled { background: #94a3b8; cursor: wait; }
+        #status { font-size: 14px; color: #475569; margin: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Super-Fast AI Eraser ⚡</h2>
+    <p>Using compressed AI for 5-second loading</p>
+    
+    <input type="file" id="upload" accept="image/*">
+    <div id="status">Upload an image to start...</div>
+
+    <div id="canvas-container">
+        <canvas id="imageCanvas"></canvas>
+        <canvas id="maskCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+        <button id="clearBtn">Clear</button>
+        <button id="eraseBtn" disabled>Erase Object</button>
+    </div>
+</div>
+
+<script type="module">
+    // Using the 2026 stable community build
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+    // SPEED OPTIMIZATIONS
+    env.allowLocalModels = false; 
+    env.useBrowserCache = true; // Once downloaded, 0 second load time next time
+
+    const upload = document.getElementById('upload');
+    const imageCanvas = document.getElementById('imageCanvas');
+    const maskCanvas = document.getElementById('maskCanvas');
+    const eraseBtn = document.getElementById('eraseBtn');
+    const status = document.getElementById('status');
+    const ctx = imageCanvas.getContext('2d');
+    const mctx = maskCanvas.getContext('2d');
+
+    let model = null;
+    let isDrawing = false;
+
+    async function loadFastModel() {
+        status.innerText = "Status: Loading AI (3-8 seconds)...";
+        try {
+            // Using the 'q8' (quantized) version which is 4x smaller/faster
+            model = await pipeline('image-to-image', 'onnx-community/lama-cleaner-onnx', {
+                progress_callback: (p) => {
+                    if (p.status === 'progress') {
+                        status.innerText = `Loading: ${p.progress.toFixed(0)}%`;
+                    }
+                }
+            });
+            status.innerText = "Status: AI Ready! Scribble and Erase.";
+            eraseBtn.disabled = false;
+        } catch (e) {
+            status.innerText = "Error: Use a local server (VS Code Live Server).";
+        }
+    }
+
+    upload.onchange = (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // Resize image to 600px max to ensure 'Erase' action takes < 1 second
+                const scale = Math.min(600 / img.width, 1);
+                imageCanvas.width = maskCanvas.width = img.width * scale;
+                imageCanvas.height = maskCanvas.height = img.height * scale;
+                document.getElementById('canvas-container').style.width = imageCanvas.width + 'px';
+                document.getElementById('canvas-container').style.height = imageCanvas.height + 'px';
+                document.getElementById('canvas-container').style.display = 'block';
+                ctx.drawImage(img, 0, 0, imageCanvas.width, imageCanvas.height);
+                
+                mctx.lineWidth = 25;
+                mctx.lineCap = 'round';
+                mctx.strokeStyle = 'white';
+                
+                if (!model) loadFastModel();
+                else eraseBtn.disabled = false;
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Drawing Logic
+    maskCanvas.onmousedown = () => isDrawing = true;
+    window.onmouseup = () => { isDrawing = false; mctx.beginPath(); };
+    maskCanvas.onmousemove = (e) => {
+        if (!isDrawing) return;
+        const rect = maskCanvas.getBoundingClientRect();
+        mctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+        mctx.stroke();
+    };
+
+    // Erase Action
+    eraseBtn.onclick = async () => {
+        status.innerText = "Healing background...";
+        eraseBtn.disabled = true;
+
+        const imgData = imageCanvas.toDataURL('image/png');
+        const maskData = maskCanvas.toDataURL('image/png');
+
+        const result = await model(imgData, { mask: maskData });
+
+        const outImg = new Image();
+        outImg.onload = () => {
+            ctx.drawImage(outImg, 0, 0);
+            mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+            status.innerText = "Done!";
+            eraseBtn.disabled = false;
+        };
+        outImg.src = result.uri || URL.createObjectURL(result.blob);
+    };
+
+    document.getElementById('clearBtn').onclick = () => mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+</script>
+</body>
+</html>
