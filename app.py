@@ -1,5 +1,4 @@
-It shows the blurred background colour
-/import streamlit as st
+import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="AI Image Dashboard", layout="wide")
@@ -137,4 +136,4 @@ if tool == "✨ Smart Object Remover":
 
     </body>
     </html>
-    """, height=720)/
+    """, height=720)
