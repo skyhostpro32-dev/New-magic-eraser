@@ -1,10 +1,5 @@
-streamlit==1.37.0
-numpy
+streamlit
 opencv-python
+numpy
 pillow
-rembg
-onnxruntime
-torch
-diffusers
-transformers
-accelerate
+lama-cleaner
