@@ -1,0 +1,10 @@
+streamlit==1.37.0
+numpy
+opencv-python
+pillow
+rembg
+onnxruntime
+torch
+diffusers
+transformers
+accelerate
