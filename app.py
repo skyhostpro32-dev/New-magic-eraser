@@ -1,18 +1,18 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="AI Image Tools", layout="wide")
+st.set_page_config(page_title="AI Image Dashboard", layout="wide")
 
 st.title("✨ AI Image Dashboard")
 
 tool = st.sidebar.selectbox(
     "Choose Tool",
-    ["✨ Blur Object Tool"]
+    ["✨ Smart Object Remover"]
 )
 
-if tool == "✨ Blur Object Tool":
+if tool == "✨ Smart Object Remover":
 
-    st.subheader("✨ Object Remove (Color Fill Tool)")
+    st.subheader("✨ Click → Remove Object (Smooth Blend)")
 
     components.html("""
     <html>
@@ -71,6 +71,7 @@ if tool == "✨ Blur Object Tool":
         pts.forEach(p => {
             const radius = p.size;
 
+            // ✅ Step 1: Get surrounding average color
             let r = 0, g = 0, b = 0, count = 0;
 
             for (let y = -radius * 2; y <= radius * 2; y++) {
@@ -99,18 +100,30 @@ if tool == "✨ Blur Object Tool":
             g = g / count;
             b = b / count;
 
+            // ✅ Step 2: Smooth blended fill
             for (let y = -radius; y <= radius; y++) {
                 for (let x = -radius; x <= radius; x++) {
 
-                    if (x*x + y*y <= radius*radius) {
+                    const dist = Math.sqrt(x*x + y*y);
+
+                    if (dist <= radius) {
                         const sx = Math.floor(p.x + x);
                         const sy = Math.floor(p.y + y);
 
                         if (sx >= 0 && sy >= 0 && sx < canvas.width && sy < canvas.height) {
                             const i = (sy * canvas.width + sx) * 4;
-                            data[i] = r;
-                            data[i+1] = g;
-                            data[i+2] = b;
+
+                            let alpha = 1 - (dist / radius);
+                            alpha = Math.pow(alpha, 1.5);
+
+                            data[i]     = data[i]     * (1 - alpha) + r * alpha;
+                            data[i + 1] = data[i + 1] * (1 - alpha) + g * alpha;
+                            data[i + 2] = data[i + 2] * (1 - alpha) + b * alpha;
+
+                            // tiny noise
+                            data[i]     += Math.random() * 2;
+                            data[i + 1] += Math.random() * 2;
+                            data[i + 2] += Math.random() * 2;
                         }
                     }
                 }
@@ -123,4 +136,4 @@ if tool == "✨ Blur Object Tool":
 
     </body>
     </html>
-    """, height=700)
+    """, height=720)
